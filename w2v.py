@@ -2,43 +2,61 @@ import random
 import numpy as np
 from nltk.corpus import brown
 
+from sklearn.manifold import TSNE
+from matplotlib import pylab
+pylab.figure(figsize=(15, 15))
+
 
 sentences = brown.sents()
 all_tokens = []
 word_to_index = {}
+tokens = []
+MAX_SENTENCES = 20000
 
 
 def populate_data_structs():
     i = 0
+    n = 0
     for s in sentences:
+        if n >= MAX_SENTENCES:
+            break
+
         for w in s:
             all_tokens.append(w)
             if w not in word_to_index:
+                tokens.append(w)
                 word_to_index[w] = i
                 i += 1
 
+        n += 1
+
 
 populate_data_structs()
+n_sentences = min(MAX_SENTENCES, len(sentences))
 
-ITERATIONS = 1000000
+ITERATIONS = 200000
 PRINT_LOSS_EVERY = 1000
 LAMBDA = 0.05
 K = 30
 BATCH_SIZE = 50
-WIDTH = 32
+WIDTH = 64
 WINDOW_SIZE = 5
 HEIGHT = len(word_to_index)
 
 matrix_v = (np.random.rand(HEIGHT, WIDTH) - 0.5)
 matrix_u = (np.random.rand(HEIGHT, WIDTH) - 0.5)
 
-print(f'Sentences: {len(sentences)}')
+print(f'Sentences: {n_sentences}')
 print(f'Tokens: {len(all_tokens)}')
 print(f'Unique words: {HEIGHT}')
 
 
+def get_random_sentence():
+    return sentences[random.randint(0, n_sentences - 1)]
+
+
 def random_word_and_its_outside_words():
-    random_sentence = sentences[random.randint(0, len(sentences) - 1)]
+    random_sentence = get_random_sentence()
     random_offset = random.randint(0, len(random_sentence) - 1)
     window_offsets = range(
         max(0, random_offset - WINDOW_SIZE),
@@ -121,6 +139,19 @@ def evaluate(v, u):
     print(np.dot(green_, blue_))
 
 
+def most_similar(word):
+    embedding = matrix_v[word_to_index[word]]
+    similarity = [(tokens[i], np.dot(embedding, matrix_v[i])) for i in range(len(tokens))]
+    similarity.sort(key=lambda t: - t[1])
+    return similarity[:10]
+
+
+def evaluate_similar():
+    print(most_similar("red"))
+    print(most_similar("green"))
+    print(most_similar("blue"))
+
+
 def train(v, u):
     for i in range(ITERATIONS):
         loss, grad_v, grad_u = loss_and_gradients(v, u)
@@ -132,4 +163,29 @@ def train(v, u):
 
 
 train(matrix_v, matrix_u)
-evaluate(matrix_v, matrix_u)
+# evaluate(matrix_v, matrix_u)
+evaluate_similar()
+
+
+def plot():
+    print("Running T-SNE")
+    tsne = TSNE(perplexity=5, n_components=2, init='pca', n_iter=5000)
+    # get the T-SNE manifold
+    two_d_embeddings = tsne.fit_transform(matrix_v)
+    print(two_d_embeddings)
+    selected_words = ['red', 'green', 'blue']
+    print("Plotting")
+    # plot all the embeddings and their corresponding words
+    for label, i in word_to_index.items():
+        x, y = two_d_embeddings[i, :]
+        pylab.scatter(x, y, c='darkgray')
+        if label in selected_words:
+            print(x, y)
+            pylab.annotate(label, xy=(x, y), xytext=(5, 2), textcoords='offset points',
+                           ha='right', va='bottom', fontsize=10)
+    print("Showing")
+    pylab.show()
+    print("Done")
+
+
+#plot()
