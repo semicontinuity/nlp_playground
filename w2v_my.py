@@ -6,6 +6,10 @@ sentences = [
     ["this", "is", "red", "ball", "falling" ],
     ["this", "is", "green", "ball", "falling"],
     ["this", "is", "blue", "ball", "falling"]]
+
+from nltk.corpus import brown
+sentences = brown.sents()
+
 all_tokens : List[str] = []
 word_to_index = {}
 tokens = []
@@ -32,19 +36,19 @@ def populate_data_structs():
 populate_data_structs()
 n_sentences = min(MAX_SENTENCES, len(sentences))
 
-ITERATIONS = 20000
+ITERATIONS = 100000
 PRINT_LOSS_EVERY = 1000
 
-K = 5
+K = 10
 ALPHA = 1
 BETA = 0.2
-GAMMA = 2   # Bigger repellence coefficient works fine (similar words become more similar), but the system diverges => need to normalize.
+GAMMA = 1   # Bigger repellence coefficient works fine (similar words become more similar), but the system diverges => need to regularize.
 LAMBDA = 0.001
 
 
-BATCH_SIZE = 10
-WIDTH = 300
-WINDOW_SIZE = 2
+BATCH_SIZE = 50
+WIDTH = 64
+WINDOW_SIZE = 5
 HEIGHT = len(word_to_index)
 
 matrix_v = (np.random.rand(HEIGHT, WIDTH) - 0.5)
@@ -92,6 +96,8 @@ def gradient(v):
         a_word_index = word_to_index[a_word]
         outside_words_indices = set((word_to_index[w] for w in outside_words))
         outside_words_indices_list = list(outside_words_indices)
+        if len(outside_words_indices_list) == 0:
+            continue
 
         debug(a_word)
         word_vector = v[a_word_index]
@@ -137,7 +143,7 @@ def gradient(v):
             # negative sample vector is repelled from context_vector
             #############################################################################
             # not strictly along diff of vectors, but at least in the direction of less correlation with context_vector
-            # this works better, but, perhaps, only cause of missing system-wide normalization.
+            # this works better, but, perhaps, only cause of missing regularization.
             grad_v[k] += GAMMA * negative_sigma_correlation * (-context_vector)
             #############################################################################
 

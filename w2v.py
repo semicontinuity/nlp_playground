@@ -141,9 +141,9 @@ def evaluate(v, u):
 
 def most_similar(word):
     embedding = matrix_v[word_to_index[word]]
-    similarity = [(tokens[i], np.dot(embedding, matrix_v[i])) for i in range(len(tokens))]
-    similarity.sort(key=lambda t: - t[1])
-    return similarity[:10]
+    tokens_and_similarities = [(tokens[i], np.dot(matrix_v[i]-embedding, matrix_v[i]-embedding)) for i in range(len(tokens))]
+    tokens_and_similarities.sort(key=lambda t: t[1])
+    return tokens_and_similarities[:10]
 
 
 def evaluate_similar():
