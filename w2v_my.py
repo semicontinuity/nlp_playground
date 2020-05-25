@@ -7,7 +7,11 @@ sentences = [
     ["this", "is", "green", "ball", "falling"],
     ["this", "is", "blue", "ball", "falling"]]
 
+
 from nltk.corpus import brown
+from nltk.corpus import stopwords
+
+stops = set(stopwords.words('english'))
 sentences = brown.sents()
 
 all_tokens : List[str] = []
@@ -92,6 +96,8 @@ def gradient(v):
     for _ in range(BATCH_SIZE):
         debug("-----------------------------------------------------------------------------------------")
         a_word, outside_words = random_word_and_its_outside_words()
+        if a_word in stops: continue
+        outside_words = [w for w in outside_words if w not in stops]
 
         a_word_index = word_to_index[a_word]
         outside_words_indices = set((word_to_index[w] for w in outside_words))

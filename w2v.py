@@ -1,13 +1,17 @@
 import random
 import numpy as np
-from nltk.corpus import brown
-
-from sklearn.manifold import TSNE
-from matplotlib import pylab
-pylab.figure(figsize=(15, 15))
+#from nltk.corpus import brown
+#from nltk.corpus import stopwords
 
 
-sentences = brown.sents()
+# sentences = [
+#     ["this", "is", "red", "ball", "falling"],
+#     ["this", "is", "green", "ball", "falling"],
+#     ["this", "is", "blue", "ball", "falling"]]
+
+#sentences = brown.sents()
+#stops = set(stopwords.words('english'))
+
 all_tokens = []
 word_to_index = {}
 tokens = []
@@ -36,19 +40,25 @@ n_sentences = min(MAX_SENTENCES, len(sentences))
 
 ITERATIONS = 200000
 PRINT_LOSS_EVERY = 1000
-LAMBDA = 0.05
+LAMBDA = 0.005
 K = 30
-BATCH_SIZE = 50
+BATCH_SIZE = 100
 WIDTH = 64
-WINDOW_SIZE = 5
+WINDOW_SIZE = 10
 HEIGHT = len(word_to_index)
 
 matrix_v = (np.random.rand(HEIGHT, WIDTH) - 0.5)
 matrix_u = (np.random.rand(HEIGHT, WIDTH) - 0.5)
 
-print(f'Sentences: {n_sentences}')
-print(f'Tokens: {len(all_tokens)}')
-print(f'Unique words: {HEIGHT}')
+def debug(*args):
+    # print(*args)
+    pass
+
+debug(f'Sentences: {n_sentences}')
+debug(f'Tokens: {len(all_tokens)}')
+debug(f'Unique words: {HEIGHT}')
+
+
 
 
 def get_random_sentence():
@@ -58,9 +68,10 @@ def get_random_sentence():
 def random_word_and_its_outside_words():
     random_sentence = get_random_sentence()
     random_offset = random.randint(0, len(random_sentence) - 1)
+    window_size = random.randint(0, WINDOW_SIZE)
     window_offsets = range(
-        max(0, random_offset - WINDOW_SIZE),
-        min(len(random_sentence), random_offset + WINDOW_SIZE + 1)
+        max(0, random_offset - window_size),
+        min(len(random_sentence), random_offset + window_size + 1)
     )
     return random_sentence[random_offset], [random_sentence[i] for i in window_offsets if i != random_offset]
 
@@ -77,6 +88,10 @@ def loss_and_gradients(v, u):
     for _ in range(BATCH_SIZE):
         a_word, outside_words = random_word_and_its_outside_words()
         a_word_index = word_to_index[a_word]
+
+        if a_word in stops: continue
+        outside_words = [w for w in outside_words if w not in stops]
+
         outside_words_indices = set((word_to_index[w] for w in outside_words))
         v_c = v[a_word_index]
 
@@ -90,8 +105,8 @@ def loss_and_gradients(v, u):
             grad_v[a_word_index] += (sigma_u_o_dot_v_c - 1) * u_o
             grad_u[an_outside_word_index] += (sigma_u_o_dot_v_c - 1) * v_c
             if an_outside_word in test_words:
-                print("OUT", an_outside_word, "for", a_word)
-                print(" sigma ", sigma_u_o_dot_v_c)
+                debug("OUT", an_outside_word, "for", a_word)
+                debug(" sigma ", sigma_u_o_dot_v_c)
                 # print(" grad_v ", grad_v[a_word_index])
                 # print(" grad_u ", grad_u[an_outside_word_index])
                 # print(" v_c ", v_c)
@@ -100,7 +115,7 @@ def loss_and_gradients(v, u):
         while True:
             random_word = all_tokens[random.randint(0, len(all_tokens) - 1)]
             if random_word in test_words:
-                print("NEG", random_word, "for", a_word)
+                debug("NEG", random_word, "for", a_word)
             random_word_index = word_to_index[random_word]
             if random_word_index in outside_words_indices:
                 continue
@@ -116,7 +131,7 @@ def loss_and_gradients(v, u):
 
         if a_word in test_words:
             # print(a_word, outside_words)
-            print(a_word, v_c)
+            debug(a_word, v_c)
 
         for index, k in enumerate(neg_sample_indices):
             grad_u[k] += (1 - sigma_minus_u_k_dot_v_c[index]) * v_c
@@ -127,22 +142,30 @@ def loss_and_gradients(v, u):
     # return loss, grad_v, grad_u
 
 
+
+def e(v, w):
+    return v[word_to_index[w]]
+
+
 def evaluate(v, u):
-    red_ = v[word_to_index["red"]]
+    red = e(v, "red")
     # print(red_)
-    green_ = v[word_to_index["green"]]
+    green = e(v, "green")
     # print(green_)
-    blue_ = v[word_to_index["blue"]]
+    blue = e(v, "blue")
     # print(blue_)
-    print(np.dot(red_, green_))
-    print(np.dot(red_, blue_))
-    print(np.dot(green_, blue_))
+    print(np.dot(red, green))
+    print(np.dot(red, blue))
+    print(np.dot(green, blue))
+
 
 
 def most_similar(word):
     embedding = matrix_v[word_to_index[word]]
-    tokens_and_similarities = [(tokens[i], np.dot(matrix_v[i]-embedding, matrix_v[i]-embedding)) for i in range(len(tokens))]
-    tokens_and_similarities.sort(key=lambda t: t[1])
+    # tokens_and_similarities = [(tokens[i], np.dot(matrix_v[i]-embedding, matrix_v[i]-embedding)) for i in range(len(tokens))]
+    tokens_and_similarities = [(tokens[i], np.dot(matrix_v[i], embedding)) for i in range(len(tokens))]
+    # tokens_and_similarities.sort(key=lambda t: t[1])
+    tokens_and_similarities.sort(key=lambda t: -t[1])
     return tokens_and_similarities[:10]
 
 
@@ -150,9 +173,12 @@ def evaluate_similar():
     print(most_similar("red"))
     print(most_similar("green"))
     print(most_similar("blue"))
+    print(most_similar("go"))
+    print(most_similar("walk"))
+    print(most_similar("run"))
 
 
-def train(v, u):
+def train_model(v, u):
     for i in range(ITERATIONS):
         loss, grad_v, grad_u = loss_and_gradients(v, u)
         if i % PRINT_LOSS_EVERY == 0:
@@ -162,10 +188,14 @@ def train(v, u):
         u -= grad_u*LAMBDA
 
 
-train(matrix_v, matrix_u)
-# evaluate(matrix_v, matrix_u)
+train_model(matrix_v, matrix_u)
 evaluate_similar()
+evaluate(matrix_v, matrix_u)
 
+
+from sklearn.manifold import TSNE
+from matplotlib import pylab
+pylab.figure(figsize=(15, 15))
 
 def plot():
     print("Running T-SNE")
